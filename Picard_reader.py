@@ -75,13 +75,12 @@ def monitor_info():
             continue
 
         if com_port is not None:
-            print('Reading info....\n')
             last_com_port = com_port
-
             try:
                 # Setup serial connection with the detected COM port
                 ser = serial.Serial(com_port, baudrate=115200, timeout=1)
 
+                print('Reading info....\n')
                 info = get_info(ser)
 
                 SoC = int((info['SoC'])[2:4],16)
@@ -90,29 +89,36 @@ def monitor_info():
                 hardware_ver = bytes.fromhex((info['hardware_ver'])[4:10]).decode('ascii')
                 bootLoader_ver = bytes.fromhex((info['bootLoader_ver'])[14:24]).decode('ascii')
                 firmware_ver = bytes.fromhex((info['firmware_ver'])[24:34]).decode('ascii')
-                pd_voltage = int.from_bytes((bytes.fromhex((info['pd_output'])[32:40])[::-1]),byteorder='big')
-                pd_current = int.from_bytes((bytes.fromhex((info['pd_output'])[40:48])[::-1]),byteorder='big')
                 temperature = int.from_bytes((bytes.fromhex((info['temperature'])[2:10])[::-1]),byteorder='big')
                 health = int.from_bytes((bytes.fromhex((info['health'])[2:6])[::-1]),byteorder='big')
-                design_capacity = int.from_bytes((bytes.fromhex((info['design_capacity'])[2:12])[::-1]),byteorder='big')
-                actual_capacity = int.from_bytes((bytes.fromhex((info['actual_capacity'])[2:12])[::-1]),byteorder='big')
-                remain_capacity = int.from_bytes((bytes.fromhex((info['remain_capacity'])[2:12])[::-1]),byteorder='big')
+                design_capacity = int.from_bytes((bytes.fromhex((info['design_capacity'])[2:6])[::-1]),byteorder='big')
+                actual_capacity = int.from_bytes((bytes.fromhex((info['actual_capacity'])[2:6])[::-1]),byteorder='big')
+                remain_capacity = int.from_bytes((bytes.fromhex((info['remain_capacity'])[2:6])[::-1]),byteorder='big')
                 voltage_1 = int.from_bytes((bytes.fromhex((info['voltage'])[2:6])[::-1]),byteorder='big')
                 voltage_2 = int.from_bytes((bytes.fromhex((info['voltage'])[6:10])[::-1]),byteorder='big')
                 voltage_3 = int.from_bytes((bytes.fromhex((info['voltage'])[10:14])[::-1]),byteorder='big')
 
+                if (info['pd_output'])[32:40] == 'ffffffff' or (info['pd_output'])[40:48] == 'ffffffff':
+                    pd_voltage = 0
+                    pd_current = 0
+                else:
+                    pd_voltage = int.from_bytes((bytes.fromhex((info['pd_output'])[32:40])[::-1]),byteorder='big')
+                    pd_current = int.from_bytes((bytes.fromhex((info['pd_output'])[40:48])[::-1]),byteorder='big')
 
-                if info is not None and len(info) > 2:
+
+                if info is not None and len(info) == 13:
                     # Print the info value if it's valid
-                    print(f"Detected COM Port: {com_port}")
-                    print(f'State of Charge (SoC): {SoC}%({abs_Soc}%)')
+                    print(f"COM Port: {com_port}")
+                    print(f'SoC(Abs_SoC): {SoC}%({abs_Soc}%)')
                     print(f'SN number: {sn_num}')
                     print(f'Hardware version: {hardware_ver}')
                     print(f'Boot Loader version: {bootLoader_ver}')
                     print(f'Firmware version: {firmware_ver}')
-                    print(f'Voltage: {voltage_1 + voltage_2 + voltage_3}mV')
+                    print(f'Battery Voltage: {voltage_1 + voltage_2 + voltage_3}mV')
                     print(f'Cells voltage: {voltage_1}mV/{voltage_2}mV/{voltage_3}mV')
-                    print(f'PD output:\n {pd_voltage}mV\n {pd_current}mA\n {(pd_voltage * pd_current) / (10 ** 6)}W')
+                    print(f'Voltage delta: {max([voltage_1, voltage_2, voltage_3]) - min([voltage_1,voltage_2,voltage_3])}mV')
+                    if pd_voltage != 0 and pd_current != 0:
+                        print(f'PD output:\n {pd_voltage}mV\n {pd_current}mA\n {(pd_voltage * pd_current) / (10 ** 6)}W')
                     print(f'Cells Temperature: {temperature / 100}')
                     print(f'Health: {health}')
                     print(f'Design Capacity: {design_capacity}mAh')
@@ -122,17 +128,16 @@ def monitor_info():
                 else:
                     print("Info reading failed or invalid responses.")
 
-                # Wait for 1 second before reading again
-                time.sleep(0.1)
 
-            except serial.SerialException:
-                monitor_info()
+                # Close the serial connection before detecting port again
+                if ser.is_open:
+                    ser.close()
 
-            # Close the serial connection before detecting port again
-            if com_port == last_com_port and ser.is_open:
-                ser.close()
-            time.sleep(1)
+            except serial.SerialException as e:
 
+                continue  # Simply continue to next iteration
+
+        time.sleep(10)
 
 # Start monitoring SOC
 monitor_info()
