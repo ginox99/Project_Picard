@@ -140,7 +140,7 @@ def monitor_info():
 
                 continue  # Simply continue to next iteration
 
-        time.sleep(10)
+        time.sleep(1)
 
 # Start monitoring SOC
 monitor_info()
