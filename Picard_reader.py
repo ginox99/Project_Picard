@@ -26,7 +26,9 @@ def get_info(ser):
         'pd_output': 'A101C40301004000',
         'temperature': 'A101E10301004000',
         'health': 'A101E40301004000',
+        'quarter_cycle': 'A101E50301004000',
         'battery_voltage': 'A101E60301004000',
+        'battery_current': 'A101E80301004000',
         'design_capacity': 'A101EB0301004000',
         'actual_capacity': 'A101EC0301004000',
         'remain_capacity': 'A101EE0301004000',
@@ -44,7 +46,9 @@ def get_info(ser):
         'pd_output': '',
         'temperature': '',
         'health': '',
+        'quarter_cycle': '',
         'battery_voltage': '',
+        'battery_current': '',
         'design_capacity': '',
         'actual_capacity':'',
         'remain_capacity': '',
@@ -93,6 +97,7 @@ def monitor_info():
                 firmware_ver = bytes.fromhex((info['firmware_ver'])[24:34]).decode('ascii')
                 temperature = int.from_bytes((bytes.fromhex((info['temperature'])[2:10])[::-1]),byteorder='big')
                 health = int.from_bytes((bytes.fromhex((info['health'])[2:6])[::-1]),byteorder='big')
+                cycle = int.from_bytes((bytes.fromhex((info['quarter_cycle'])[2:6])[::-1]),byteorder='big') / 4
                 design_capacity = int.from_bytes((bytes.fromhex((info['design_capacity'])[2:6])[::-1]),byteorder='big')
                 actual_capacity = int.from_bytes((bytes.fromhex((info['actual_capacity'])[2:6])[::-1]),byteorder='big')
                 remain_capacity = int.from_bytes((bytes.fromhex((info['remain_capacity'])[2:6])[::-1]),byteorder='big')
@@ -100,6 +105,7 @@ def monitor_info():
                 voltage_2 = int.from_bytes((bytes.fromhex((info['cell_voltage'])[6:10])[::-1]),byteorder='big')
                 voltage_3 = int.from_bytes((bytes.fromhex((info['cell_voltage'])[10:14])[::-1]),byteorder='big')
                 battery_voltage = int.from_bytes((bytes.fromhex((info['battery_voltage'])[2:6])[::-1]),byteorder='big')
+                battery_current = int.from_bytes(bytes.fromhex(info['battery_current'][2:6])[::-1], byteorder='big', signed=True)
 
                 if (info['pd_output'])[32:40] == 'ffffffff' or (info['pd_output'])[40:48] == 'ffffffff':
                     pd_voltage = 0
@@ -109,7 +115,7 @@ def monitor_info():
                     pd_current = int.from_bytes((bytes.fromhex((info['pd_output'])[40:48])[::-1]),byteorder='big')
 
 
-                if info is not None and len(info) == 14:
+                if info is not None and len(info) == 16:
                     # Print the info value if it's valid
                     print(f"COM Port: {com_port}")
                     print(f'SoC(Abs_SoC): {SoC}%({abs_Soc}%)')
@@ -118,12 +124,14 @@ def monitor_info():
                     print(f'Boot Loader version: {bootLoader_ver}')
                     print(f'Firmware version: {firmware_ver}')
                     print(f'Battery Voltage: {battery_voltage}mV')
+                    print(f'Battery current: {battery_current}mA')
                     print(f'Cells voltage: {voltage_1}mV/{voltage_2}mV/{voltage_3}mV')
                     print(f'Voltage delta: {max([voltage_1, voltage_2, voltage_3]) - min([voltage_1,voltage_2,voltage_3])}mV')
                     if pd_voltage != 0 and pd_current != 0:
                         print(f'PD output:\n {pd_voltage}mV\n {pd_current}mA\n {(pd_voltage * pd_current) / (10 ** 6)}W')
                     print(f'Cells Temperature: {temperature / 100}')
                     print(f'Health: {health}')
+                    print(f'Cycle: {cycle}')
                     print(f'Design Capacity: {design_capacity}mAh')
                     print(f'Actual Capacity: {actual_capacity}mAh')
                     print(f'Remaining Capacity: {remain_capacity}mAh\n')

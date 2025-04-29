@@ -7,11 +7,11 @@ import keyboard
 import threading
 
 # Setup variables and lists
-min_charged_voltage = 12.4 # Battery voltage reaches 12.4V when fully charged
-min_cell_charged_voltage = 4.15 * 1000 # Single cells reaches 4150mV when fully charged
+min_charged_voltage = 12.45 # Voltage when battery reaches fully charged state
+max_charged_voltage = 12.57 # Maximum allowance voltage for battery pack
 max_SoC_difference = 0.05 # (SoC-abs_SoC)/SoC <= 5%
 max_delta_charged = 10 # Allowance cells delta(mV) when fully charged
-max_delta = 100 # Maximum cells delta(mV)
+max_delta = 50 # Maximum cells delta(mV)
 defective_list = []
 com_port_list = []
 
@@ -39,7 +39,7 @@ def get_info(ser):
     ser.write(bytes.fromhex('A101E60301004000')) # Command for battery voltage
     voltage = ser.read(64)
 
-    ser.write(bytes.fromhex('A101EF0301004000'))
+    ser.write(bytes.fromhex('A101EF0301004000')) # Command for cells voltage
     cell_voltage = ser.read(64)
 
     return soc, abs_soc, sn, voltage, cell_voltage
@@ -56,7 +56,7 @@ def monitor_soc():
         com_port = detect_serial_port()
 
         if com_port == last_com_port:
-            time.sleep(3)
+            time.sleep(5)
 
         if com_port:
             last_com_port = com_port
@@ -116,13 +116,14 @@ def monitor_soc():
                             defective_list.append([serial_number, symptom])
 
                     # When battery is fully charged
-                    if 99 <= SoC <= 100 or max(cell_voltage_1, cell_voltage_2, cell_voltage_3) >= min_cell_charged_voltage:
+                    if 99 <= SoC <= 100:
                         if SoC_difference <= max_SoC_difference and voltage_delta <= max_delta_charged and voltage >= min_charged_voltage:
+
                             template_pass()
 
                         else:
                             if voltage < min_charged_voltage:
-                                symptom = 'Abnormal Voltage'
+                                symptom = 'Low Voltage'
 
                             if SoC_difference > max_SoC_difference:
                                 symptom = 'Abnormal Abs_SoC'
@@ -132,19 +133,24 @@ def monitor_soc():
 
                             template_fail()
 
-                   # When battery is under charged
+
+                    # When battery is under charged
                     elif SoC < 99:
-                       if SoC_difference <= max_SoC_difference and voltage_delta <= max_delta:
-                           template_pass()
+                        if SoC_difference <= max_SoC_difference and voltage_delta <= max_delta and voltage < max_charged_voltage:
 
-                       else:
-                        if SoC_difference > max_SoC_difference:
-                            symptom = 'Abnormal Abs_SoC'
+                            template_pass()
 
-                        if voltage_delta > max_delta:
-                            symptom = f'Imbalanced Cells Voltage: {cell_voltage_1}mV/ {cell_voltage_2}mV/ {cell_voltage_3}mV'
+                        else:
+                            if voltage >= max_charged_voltage:
+                                symptom = 'SoC Reading Issue'
 
-                        template_fail()
+                            if SoC_difference > max_SoC_difference:
+                                symptom = 'Abnormal Abs_SoC'
+
+                            if voltage_delta > max_delta:
+                                symptom = f'Imbalanced Cells Voltage: {cell_voltage_1}mV/ {cell_voltage_2}mV/ {cell_voltage_3}mV'
+
+                            template_fail()
 
 
                     time.sleep(1)
